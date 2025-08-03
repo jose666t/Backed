@@ -1,8 +1,13 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from yt_dlp import YoutubeDL
-import re
 
 app = Flask(__name__)
+CORS(app)  # Permite solicitudes desde cualquier origen (frontend)
+
+@app.route('/')
+def home():
+    return 'Backend corriendo, bro!'
 
 @app.route('/buscar')
 def buscar():
@@ -17,20 +22,22 @@ def buscar():
         'noplaylist': True,
     }
 
-    with YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(query, download=False)
-        video = info['entries'][0]
+    try:
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(query, download=False)
+            video = info['entries'][0]
 
-        # Filtrar el stream de audio directo
-        audio_url = video.get('url', '')
-        title = video.get('title', '')
-        thumbnail = video.get('thumbnail', '')
+            audio_url = video.get('url', '')
+            title = video.get('title', '')
+            thumbnail = video.get('thumbnail', '')
 
-        return jsonify({
-            'title': title,
-            'thumbnail': thumbnail,
-            'url': audio_url
-        })
+            return jsonify({
+                'title': title,
+                'thumbnail': thumbnail,
+                'url': audio_url
+            })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
