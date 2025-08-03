@@ -1,43 +1,35 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS
-from yt_dlp import YoutubeDL
+import yt_dlp
+import os
 
 app = Flask(__name__)
-CORS(app)  # Permite solicitudes desde cualquier origen (frontend)
 
-@app.route('/')
-def home():
-    return 'Backend corriendo, bro!'
-
-@app.route('/buscar')
-def buscar():
-    query = request.args.get('q')
-    if not query:
-        return jsonify({'error': 'Falta parámetro q'}), 400
+@app.route('/api/download', methods=['POST'])
+def download_audio():
+    data = request.json
+    url = data.get('url')
+    if not url:
+        return jsonify({'error': 'URL faltante'}), 400
 
     ydl_opts = {
-        'format': 'bestaudio[ext=m4a]/bestaudio/best',
-        'quiet': True,
-        'default_search': 'ytsearch1',
+        'format': 'bestaudio/best',
+        'outtmpl': '%(title)s.%(ext)s',
         'noplaylist': True,
+        'quiet': True,
+        'cookies': os.path.join(os.path.dirname(__file__), 'cookies.txt'),
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }],
     }
 
     try:
-        with YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(query, download=False)
-            video = info['entries'][0]
-
-            audio_url = video.get('url', '')
-            title = video.get('title', '')
-            thumbnail = video.get('thumbnail', '')
-
-            return jsonify({
-                'title': title,
-                'thumbnail': thumbnail,
-                'url': audio_url
-            })
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            return jsonify({'title': info['title'], 'url': info['webpage_url']})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run()
