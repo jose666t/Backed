@@ -1,42 +1,46 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import yt_dlp
+import os
 
 app = Flask(__name__)
 CORS(app)
 
-@app.route("/search", methods=["POST"])
-def buscar():
-    data = request.get_json()
-    query = data.get("search")
-
+@app.route("/buscar", methods=["GET"])
+def buscar_musica():
+    query = request.args.get("q")
     if not query:
-        return jsonify({"error": "Falta el término de búsqueda"}), 400
+        return jsonify({"error": "Parámetro 'q' requerido"}), 400
 
     try:
         ydl_opts = {
-            "format": "bestaudio/best",
             "quiet": True,
-            "extract_flat": True,  # Solo info, sin descargar
+            "extract_flat": True,
+            "forcejson": True,
+            "skip_download": True,
+            "default_search": "ytsearch10",  # Busca los 10 primeros resultados
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch15:{query}", download=False)
-            resultados = []
+            result = ydl.extract_info(query, download=False)
 
-            for video in info["entries"]:
+        resultados = []
+        for entry in result.get("entries", []):
+            if "title" in entry:
                 resultados.append({
-                    "titulo": video.get("title"),
-                    "url": f"https://www.youtube.com/watch?v={video.get('id')}",
-                    "portada": video.get("thumbnails", [{}])[0].get("url", ""),
-                    "artista": video.get("uploader")
+                    "titulo": entry.get("title"),
+                    "url": f"https://www.youtube.com/watch?v={entry.get('id')}",
+                    "canal": entry.get("uploader"),
+                    "id": entry.get("id"),
+                    "thumbnail": entry.get("thumbnail")
                 })
 
-            return jsonify(resultados)
+        return jsonify(resultados)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
