@@ -1,44 +1,42 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import yt_dlp
-import os
 
 app = Flask(__name__)
+CORS(app)
 
-@app.route('/')
-def home():
-    return jsonify({"status": "Backend activo 🚀"})
+@app.route("/search", methods=["POST"])
+def buscar():
+    data = request.get_json()
+    query = data.get("search")
 
-@app.route('/api/download', methods=['POST'])
-def download_audio():
-    data = request.json
-    url = data.get('url')
-    if not url:
-        return jsonify({'error': 'URL faltante'}), 400
-
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': '%(title)s.%(ext)s',
-        'noplaylist': True,
-        'quiet': True,
-        'cookies': os.path.join(os.path.dirname(__file__), 'cookies.txt'),
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-    }
+    if not query:
+        return jsonify({"error": "Falta el término de búsqueda"}), 400
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            return jsonify({
-                'title': info['title'],
-                'url': info['webpage_url'],
-                'thumbnail': info.get('thumbnail', ''),
-                'duration': info.get('duration', 0)
-            })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        ydl_opts = {
+            "format": "bestaudio/best",
+            "quiet": True,
+            "extract_flat": True,  # Solo info, sin descargar
+        }
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch15:{query}", download=False)
+            resultados = []
+
+            for video in info["entries"]:
+                resultados.append({
+                    "titulo": video.get("title"),
+                    "url": f"https://www.youtube.com/watch?v={video.get('id')}",
+                    "portada": video.get("thumbnails", [{}])[0].get("url", ""),
+                    "artista": video.get("uploader")
+                })
+
+            return jsonify(resultados)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
