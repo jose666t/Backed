@@ -4,6 +4,10 @@ import os
 
 app = Flask(__name__)
 
+@app.route('/')
+def home():
+    return jsonify({"status": "Backend activo 🚀"})
+
 @app.route('/api/download', methods=['POST'])
 def download_audio():
     data = request.json
@@ -27,9 +31,14 @@ def download_audio():
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-            return jsonify({'title': info['title'], 'url': info['webpage_url']})
+            return jsonify({
+                'title': info['title'],
+                'url': info['webpage_url'],
+                'thumbnail': info.get('thumbnail', ''),
+                'duration': info.get('duration', 0)
+            })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host='0.0.0.0', port=5000)
